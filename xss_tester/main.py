@@ -3,6 +3,8 @@ import httpx
 
 from xss_tester.core.detector import Detector
 from xss_tester.engine import load_payloads, test_point
+from xss_tester.core.colors import Colors as C
+from xss_tester.config import VERSION
 
 # Definim headers HTTP per a les peticions (WAF-friendly), TODO ser configurable
 HEADERS = {
@@ -16,17 +18,10 @@ HEADERS = {
     "Connection": "close",
 }
 
-# definim colors per a la sortida per consola
-class C:
-    RED     = "\033[91m"
-    GREEN   = "\033[92m"
-    YELLOW  = "\033[93m"
-    BLUE    = "\033[94m"
-    CYAN    = "\033[96m"
-    RESET   = "\033[0m"
-    BOLD    = "\033[1m"
 
 def main():
+    print(f"{C.BLUE}{C.BOLD}XSS Tester v{VERSION}{C.RESET}")
+
     if len(sys.argv) != 2:
         print("Usage: python -m xss_tester.main <target_url>")
         sys.exit(1)
@@ -68,21 +63,13 @@ def main():
 
         findings = test_point(point, payloads)
         if not findings:
-            print(f"    {C.CYAN}[-] No reflection detected{C.RESET}")
             continue
 
         for f in findings:
             if f.executed:
-                print(f"    {C.RED}{C.BOLD}[!!!] XSS CONFIRMED{C.RESET}")
                 print(f"          {C.RED}Payload:{C.RESET} {f.payload.value}")
                 print(f"          {C.YELLOW}Context:{C.RESET} {f.injection_point.context}")
                 print(f"          {C.YELLOW}Risk:{C.RESET} {f.injection_point.risk_score}")
-            elif f.reflected:
-                print(f"    {C.YELLOW}[*] Reflected (not executed){C.RESET}")
-            else:
-                print(f"    {C.GREEN}[-] Not vulnerable{C.RESET}")
-
-
 
 if __name__ == "__main__":
     main()

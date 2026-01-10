@@ -18,6 +18,8 @@ class InjectionPoint(BaseModel):
     context: Optional[str] = None
     subcontext: Optional[str] = None
     risk_score: int = 0
+    attack_surface: str = "main"  # main, iframe
+    confidence: str = "certain"   # certain, potential
 
 
 class Payload(BaseModel):
@@ -28,7 +30,7 @@ class Payload(BaseModel):
     expected_context: Optional[str] = None
     expected_subcontext: Optional[str] = None
 
-    # 🔥 NOU: events necessaris per executar el payload
+    # events necessaris per executar el payload
     # Ex: ["ontoggle"], ["onmouseover"], ["onfocus"]
     requires: List[str] = []
 

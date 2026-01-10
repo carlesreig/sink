@@ -1,6 +1,7 @@
 # config.py
 
 # ---------- GENERAL ----------
+VERSION = "0.6.20"
 # identificador unic per detectar reflexions
 MARKER = "DPECE14"
 

@@ -28,6 +28,12 @@ class Validator:
         context, subcontext = detector.detect(response.text, marker)
 
         finding.reflected = marker in response.text
+
+        if finding.injection_point.source in ["fragment", "fragment_query"]:
+            finding.reflected = True
+            context = "dom"
+            subcontext = "fragment"
+
         finding.injection_point.context = context
         finding.injection_point.subcontext = subcontext
         finding.injection_point.risk_score = self._calculate_risk(context, subcontext)

@@ -10,6 +10,21 @@ class Injector:
 
     def inject(self, point: InjectionPoint, payload: Payload):
 
+        # Gestió de fragments (client-side injection)
+        if point.source == "fragment":
+            return httpx.get(
+                f"{point.url}#{payload.value}",
+                timeout=REQUEST_TIMEOUT,
+                follow_redirects=True
+            )
+
+        if point.source == "fragment_query":
+            return httpx.get(
+                f"{point.url}?{point.parameter}={payload.value}",
+                timeout=REQUEST_TIMEOUT,
+                follow_redirects=True
+            )
+
         if point.form:
             data = dict(point.form.fields)
             data[point.parameter] = payload.value
