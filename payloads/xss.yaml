@@ -1,0 +1,58 @@
+xss:
+  - value: "<script>alert(1)</script>"
+    expected_context: html
+    expected_subcontext: text
+
+  - value: "\"><script>alert(1)</script>"
+    expected_context: html
+    expected_subcontext: attribute
+
+  - value: "<img src=x onerror=alert(1)>"
+    expected_context: html
+    requires: ["onerror"]
+
+  - value: "<svg/onload=alert(1)>"
+    expected_context: html
+    requires: ["onload"]
+
+  - value: "javascript:alert(1)"
+    expected_context: attribute
+
+  - value: "'\"><img src=x>"
+    expected_context: attribute
+
+
+  - value: "';alert(1);//"
+    expected_context: javascript
+
+  - value: "</script><script>alert(1)</script>"
+    expected_context: javascript
+
+
+execution:
+  - value: "<script>document.title='XSS_EXEC'</script>"
+    expected_context: html
+
+  - value: "<img src=x onerror=\"document.body.setAttribute('data-xss','1')\">"
+    expected_context: attribute
+    requires: ["onerror"]
+
+  - value: "<svg onload=\"window.__xss=true\"></svg>"
+    expected_context: html
+    requires: ["onload"]
+
+  - value: "<script>console.log('XSS_EXEC')</script>"
+    expected_context: html
+
+
+alerts:
+  - value: "<script>alert(1)</script>"
+    expected_context: html
+
+  - value: "\"><script>alert(1)</script>"
+    expected_context: attribute
+
+  - value: |-
+      '"><details open ontoggle=alert(1)>
+    expected_context: attribute
+    requires: ["ontoggle"]
