@@ -56,6 +56,19 @@ def load_payloads(path: str | None = None) -> List[Payload]:
 # Injection point tester
 # ----------------------------------------------------------------------
 
+def _inject_safe(injector, point, payload):
+    """
+    Helper per injectar i mesurar temps de forma segura.
+    Retorna (response, elapsed_time) o (None, error).
+    """
+    try:
+        start = time.time()
+        response = injector.inject(point, payload)
+        return response, time.time() - start
+    except Exception as e:
+        return None, e
+
+
 def test_point(point: InjectionPoint, payloads: List[Payload]):
     """
     Funció principal per testar un punt d’injecció
@@ -82,24 +95,39 @@ def test_point(point: InjectionPoint, payloads: List[Payload]):
 
     marker_payload = Payload(value=MARKER, category="context")
 
-    try:
-        start = time.time()
-        response = injector.inject(point, marker_payload)
-        marker_time = time.time() - start
-    except Exception as e:
-        print(f"    {C.RED}[!] Error injecting marker: {e}{C.RESET}")
+    response, result = _inject_safe(injector, point, marker_payload)
+    if response is None:
+        print(f"    {C.RED}[!] Error injecting marker: {result}{C.RESET}")
         return []
 
-    if MARKER not in response.text:
-        if point.source in ["fragment", "fragment_query"]:
+    # Check reflection
+    reflected = MARKER in response.text
+
+    # Retry with slash for path parameters (common in returnPath, redirect, etc.)
+    if not reflected and any(x in point.parameter.lower() for x in ["path", "url", "next", "ret", "redirect", "goto"]):
+        print(f"    {C.CYAN}[*] Path parameter detected, retrying with / prefix...{C.RESET}")
+        slashed_marker = Payload(value="/" + MARKER, category="context")
+        response, result = _inject_safe(injector, point, slashed_marker)
+        if response and MARKER in response.text:
+            reflected = True
+            print(f"    {C.YELLOW}[*] Marker reflected (with / prefix) ({result:.2f}s){C.RESET}")
+
+    if not reflected:
+        if point.source in ["fragment", "fragment_query", "dom_static"]:
             print(f"    {C.CYAN}[*] Fragment source: skipping reflection check{C.RESET}")
             point.context = "dom"
-            point.subcontext = "fragment"
+            if point.source != "dom_static":
+                point.subcontext = "fragment"
+        # Heuristic: Force check for suspicious DOM sinks even if not reflected
+        elif any(x in point.parameter.lower() for x in ["return", "redirect", "next", "url", "goto"]):
+            print(f"    {C.CYAN}[!] Suspicious DOM parameter (blind), forcing browser check...{C.RESET}")
+            point.context = "dom"
+            point.subcontext = "dom_sink.navigation"
         else:
-            print(f"    {C.GREEN}[-] No reflection detected (marker) ({marker_time:.2f}s){C.RESET}")
+            print(f"    {C.GREEN}[-] No reflection detected (marker) ({result:.2f}s){C.RESET}")
             return []
     else:
-        print(f"    {C.YELLOW}[*] Marker reflected ({marker_time:.2f}s){C.RESET}")
+        print(f"    {C.YELLOW}[*] Marker reflected ({result:.2f}s){C.RESET}")
         context, subcontext = context_detector.detect(response.text, MARKER)
         point.context = context
         point.subcontext = subcontext
@@ -123,12 +151,9 @@ def test_point(point: InjectionPoint, payloads: List[Payload]):
         desc=f"    Payloads [{point.parameter}]",
         leave=False
     ):
-        try:
-            start = time.time()
-            response = injector.inject(point, payload)
-            elapsed = time.time() - start
-        except Exception as e:
-            print(f"    {C.RED}[!] Error injecting payload: {e}{C.RESET}")
+        response, elapsed = _inject_safe(injector, point, payload)
+        if response is None:
+            print(f"    {C.RED}[!] Error injecting payload: {elapsed}{C.RESET}")
             continue
 
         finding = Finding(
@@ -136,8 +161,21 @@ def test_point(point: InjectionPoint, payloads: List[Payload]):
             payload=payload
         )
 
+        # Capture context before passive analysis (which might reset it if not reflected)
+        pre_context = point.context
+        pre_subcontext = point.subcontext
+
         # --- Passive analysis
         finding = validator.passive_analysis(response, finding, payload.value)
+
+        # Restore context for blind DOM / static DOM cases if passive analysis failed to find reflection
+        if not finding.reflected and (
+            (pre_context == "dom" and pre_subcontext == "dom_sink.navigation") or
+            point.source == "dom_static"
+        ):
+            finding.reflected = True
+            finding.injection_point.context = pre_context
+            finding.injection_point.subcontext = pre_subcontext
 
         if finding.reflected:
             finding = validator.active_validation(str(response.url), finding)

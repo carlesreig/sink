@@ -1,7 +1,9 @@
 import httpx
+import re
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs, urljoin
 from .models import InjectionPoint, Form
+from .context_detector import ContextDetector
 
 
 class Detector:
@@ -36,6 +38,11 @@ class Detector:
         # --------------------------------------------------
         self._scan_iframes(url, soup, add_point)
 
+        # --------------------------------------------------
+        # FASE 4: Static JS Analysis (DOM-XSS)
+        # --------------------------------------------------
+        self._scan_static_js(url, soup, add_point)
+
         return points
 
     # ----------------------------------------------------------------------
@@ -61,25 +68,43 @@ class Detector:
         fragment = parsed.fragment
         has_fragment = bool(fragment)
 
-        # Heurística: Detectar routing JS si no hi ha fragment explícit
-        uses_routing = False
-        if not has_fragment:
-            for script in soup.find_all("script"):
-                if script.text and ("location.hash" in script.text or "onhashchange" in script.text):
-                    uses_routing = True
-                    break
+        # Millora: Detectar fonts DOM (Sources) en JS i Events
+        dom_patterns = [
+            "location.hash", "location.href", "location.search",
+            "document.URL", "document.documentURI", "baseURI",
+            "onhashchange", "URLSearchParams"
+        ]
+        uses_dom_source = False
+
+        # 1. Buscar en scripts
+        for script in soup.find_all("script"):
+            if script.text and any(p in script.text for p in dom_patterns):
+                uses_dom_source = True
+                break
+
+        # 2. Buscar en events HTML (onclick, onload, etc.)
+        if not uses_dom_source:
+            for tag in soup.find_all():
+                for attr, val in tag.attrs.items():
+                    if attr.startswith("on") and any(p in str(val) for p in dom_patterns):
+                        uses_dom_source = True
+                        break
 
         # Punt d'injecció genèric al fragment
-        if has_fragment or uses_routing:
+        if has_fragment or uses_dom_source:
             query = f"?{parsed.query}" if parsed.query else ""
             target_url = f"{base_url}{query}"
+            
+            # Si hem detectat ús de DOM, pugem la confiança
+            confidence = "certain" if uses_dom_source else "potential"
+
             add_point(InjectionPoint(
                 url=target_url,
                 method="GET",
                 parameter="#fragment",
                 source="fragment",
                 attack_surface="main",
-                confidence="potential"
+                confidence=confidence
             ))
 
         # 1.3 Parse parameters INSIDE fragment (SPA / Hash params)
@@ -125,9 +150,31 @@ class Detector:
                 name = field.get("name")
                 if not name:
                     continue
+                
+                value = field.get("value")
+                # Handle textarea content if value attr is missing
+                if field.name == "textarea" and not value:
+                    value = field.text
+
+                if not value:
+                    # Heuristics for default values to pass validation
+                    field_type = field.get("type", "").lower()
+                    name_lower = name.lower()
+                    
+                    if field_type == "email" or "email" in name_lower:
+                        value = "test@example.com"
+                    elif "url" in name_lower or "website" in name_lower:
+                        value = "http://example.com"
+                    elif "date" in name_lower:
+                        value = "2024-01-01"
+                    elif "number" in field_type or "id" in name_lower:
+                        value = "1"
+                    else:
+                        value = "test"
+
                 if field.get("type", "").lower() not in ("submit", "button", "hidden"):
                     injectable.append(name)
-                fields[name] = field.get("value")
+                fields[name] = value
 
             if injectable:
                 form_obj = Form(action=action, method=method, fields=fields, injectable_fields=injectable)
@@ -160,3 +207,43 @@ class Detector:
                         self._scan_url_and_fragments(iframe_url, iframe_soup, add_point)
                 except Exception:
                     pass
+
+    # ----------------------------------------------------------------------
+    # FASE 4: Static JS Analysis
+    # ----------------------------------------------------------------------
+    def _scan_static_js(self, base_url, soup, add_point):
+        detector = ContextDetector()
+        
+        # Collect all JS content (inline scripts + event handlers)
+        scripts = [s.text for s in soup.find_all("script") if s.text]
+        for tag in soup.find_all():
+            for attr, val in tag.attrs.items():
+                if attr.startswith("on"):
+                    scripts.append(str(val))
+
+        for script in scripts:
+            result = detector.analyze_js_static(script)
+            if result:
+                # Determine confidence based on sanitization checks
+                is_sanitized = any(re.search(p, script) for p in [
+                    r"startsWith\(", r"escape\(", r"encodeURIComponent\(", 
+                    r"whitelist", r"^[a-zA-Z0-9_-]+$"
+                ])
+                
+                confidence = "low" if is_sanitized else "high"
+                
+                # If we identified a specific parameter being passed to a sink
+                if result["parameter"]:
+                    add_point(InjectionPoint(
+                        url=base_url,
+                        method="GET",
+                        parameter=result["parameter"],
+                        source="dom_static",
+                        context="dom",
+                        subcontext=result["sink_type"],
+                        attack_surface="main",
+                        confidence=confidence
+                    ))
+                
+                # Note: If no parameter is found, we could flag the URL itself, 
+                # but we prioritize actionable parameter-based findings.

@@ -48,9 +48,16 @@ class ExecutionTriggerEngine:
     # ----------------------------------------------------------
     # Triggers
     # ----------------------------------------------------------
-    def _trigger_focus_blur(self, page, point, payload=None) -> bool:
+    def _execute_js_trigger(self, page, script: str) -> bool:
+        """Helper per executar JS de forma segura i comprovar XSS"""
         try:
-            page.evaluate("""
+            page.evaluate(script)
+            return self._post_trigger_check(page)
+        except Exception:
+            return False
+
+    def _trigger_focus_blur(self, page, point, payload=None) -> bool:
+        return self._execute_js_trigger(page, """
                 () => {
                     document.querySelectorAll(
                         'input, textarea, select, [contenteditable]'
@@ -62,13 +69,9 @@ class ExecutionTriggerEngine:
                     });
                 }
             """)
-            return self._post_trigger_check(page)
-        except Exception:
-            return False
 
     def _trigger_mouse_events(self, page, point, payload=None) -> bool:
-        try:
-            page.evaluate("""
+        return self._execute_js_trigger(page, """
                 () => {
                     const events = [
                         'mouseover', 'mouseenter',
@@ -87,13 +90,9 @@ class ExecutionTriggerEngine:
                     });
                 }
             """)
-            return self._post_trigger_check(page)
-        except Exception:
-            return False
 
     def _trigger_keyboard_events(self, page, point, payload=None) -> bool:
-        try:
-            page.evaluate("""
+        return self._execute_js_trigger(page, """
                 () => {
                     const events = ['keydown', 'keyup', 'keypress'];
 
@@ -110,13 +109,9 @@ class ExecutionTriggerEngine:
                     });
                 }
             """)
-            return self._post_trigger_check(page)
-        except Exception:
-            return False
 
     def _trigger_change_submit(self, page, point, payload=None) -> bool:
-        try:
-            page.evaluate("""
+        return self._execute_js_trigger(page, """
                 () => {
                     document.querySelectorAll(
                         'input, textarea, select'
@@ -140,9 +135,6 @@ class ExecutionTriggerEngine:
                     });
                 }
             """)
-            return self._post_trigger_check(page)
-        except Exception:
-            return False
 
     def _trigger_click_generic(self, page, point, payload=None) -> bool:
         """
@@ -180,8 +172,7 @@ class ExecutionTriggerEngine:
             return False
 
     def _trigger_timers(self, page, point, payload=None) -> bool:
-        try:
-            page.evaluate("""
+        return self._execute_js_trigger(page, """
                 () => {
                     try {
                         setTimeout(() => {}, 10);
@@ -189,9 +180,6 @@ class ExecutionTriggerEngine:
                     } catch(e) {}
                 }
             """)
-            return self._post_trigger_check(page)
-        except Exception:
-            return False
 
     # ----------------------------------------------------------
     # Shared helpers

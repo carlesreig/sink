@@ -23,6 +23,26 @@ ENCODINGS = {
     "\\x3c": "js_hex"
 }
 
+# --- Static Analysis Patterns ---
+DOM_SOURCES = [
+    r"location\.(search|hash|href)", r"document\.(URL|location|documentURI)",
+    r"new\s+URLSearchParams", r"window\.location"
+]
+
+DOM_SINKS_STATIC = {
+    "dom_sink.html": [
+        r"\.innerHTML\s*=", r"\.outerHTML\s*=", r"document\.write\s*\(",
+        r"\.insertAdjacentHTML\s*\("
+    ],
+    "dom_sink.execution": [
+        r"eval\s*\(", r"setTimeout\s*\(", r"setInterval\s*\("
+    ],
+    "dom_sink.navigation": [
+        r"location\.href\s*=", r"window\.location\s*=",
+        r"\.attr\(\s*['\"]href['\"]\s*,", r"\.prop\(\s*['\"]href['\"]\s*,"
+    ]
+}
+
 
 class ContextDetector:
 
@@ -116,3 +136,49 @@ class ContextDetector:
 
     def _looks_like_dom_sink(self, value: str):
         return any(x in value.lower() for x in ["javascript:", "data:"])
+
+    # -------------------------------------------------
+    # Static JS Analysis (Hybrid Detection)
+    # -------------------------------------------------
+    def analyze_js_static(self, script: str) -> dict | None:
+        """
+        Analitza un bloc de JS per trobar fluxos Source -> Sink.
+        Retorna un dict amb detalls o None.
+        """
+        # 1. Detect Source
+        found_source = None
+        for src in DOM_SOURCES:
+            if re.search(src, script):
+                found_source = src
+                break
+        
+        if not found_source:
+            return None
+
+        # 2. Detect Sink
+        found_sink = None
+        sink_type = None
+        for stype, patterns in DOM_SINKS_STATIC.items():
+            for pat in patterns:
+                if re.search(pat, script):
+                    found_sink = pat
+                    sink_type = stype
+                    break
+            if found_sink:
+                break
+        
+        if not found_sink:
+            return None
+
+        # 3. Heuristic: Extract parameter name (e.g. .get('param'))
+        param = None
+        param_match = re.search(r"\.get\(\s*['\"]([a-zA-Z0-9_]+)['\"]\s*\)", script)
+        if param_match:
+            param = param_match.group(1)
+
+        return {
+            "source": found_source,
+            "sink": found_sink,
+            "sink_type": sink_type,
+            "parameter": param
+        }

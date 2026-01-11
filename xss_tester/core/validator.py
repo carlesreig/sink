@@ -5,6 +5,7 @@ from xss_tester.core.execution_triggers import ExecutionTriggerEngine
 from xss_tester.core.dom_discovery import DOMDiscovery
 from xss_tester.config import PLAYWRIGHT, RISK_SCORE
 import time
+import json
 
 
 class Validator:
@@ -50,6 +51,10 @@ class Validator:
         executed = False
         evidence = []
 
+        # 0️⃣ Evidence based on static analysis
+        if finding.injection_point.source == "fragment" and finding.injection_point.confidence == "certain":
+            evidence.append("DOM_SOURCE_DETECTED")
+
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=PLAYWRIGHT["headless"]
@@ -58,17 +63,29 @@ class Validator:
             page = context.new_page()
 
             try:
+                # Prepare payload for JS injection
+                payload_json = json.dumps(finding.payload.value)
+
                 # ------------------------------------------------------
                 # 1️⃣ Inject Hooks BEFORE Navigation (CRITICAL FIX)
                 # ------------------------------------------------------
-                page.add_init_script("""
-                    (() => {
-                        window.__xss = { triggered: false, reasons: [] };
+                page.add_init_script(f"""
+                    (() => {{
+                        window.__xss = {{ triggered: false, reasons: [] }};
+                        const payload = {payload_json};
 
-                        const flag = (reason) => {
+                        const flag = (reason) => {{
                             window.__xss.triggered = true;
                             window.__xss.reasons.push(reason);
-                        };
+                        }};
+
+                        const check = (val, type) => {{
+                            try {{
+                                if (String(val).includes(payload)) {{
+                                    flag("DOM_SINK_CONFIRMED: " + type);
+                                }}
+                            }} catch(e) {{}}
+                        }};
 
                         // Dialogs
                         window.alert = () => flag("alert()");
@@ -77,42 +94,46 @@ class Validator:
 
                         // Console
                         const origLog = console.log;
-                        console.log = function(msg) {
+                        console.log = function(msg) {{
                             if (String(msg).includes("XSS")) flag("console.log");
                             origLog.apply(console, arguments);
-                        };
+                        }};
 
                         // DOM-XSS sinks (SAFE)
-                        const hook = (obj, prop) => {
+                        const hook = (obj, prop) => {{
                             const original = obj[prop];
-                            obj[prop] = function() {
-                                flag(prop);
+                            obj[prop] = function() {{
+                                // Check arguments for payload
+                                for (let i=0; i<arguments.length; i++) check(arguments[i], prop);
                                 return original.apply(this, arguments);
-                            };
-                        };
+                            }};
+                        }};
 
                         hook(window, "eval");
                         hook(window, "setTimeout");
                         hook(window, "setInterval");
                         hook(document, "write");
 
-                        ["innerHTML", "outerHTML"].forEach(prop => {
+                        ["innerHTML", "outerHTML"].forEach(prop => {{
                             const desc = Object.getOwnPropertyDescriptor(Element.prototype, prop);
-                            Object.defineProperty(Element.prototype, prop, {
-                                set(value) { flag(prop); return desc.set.call(this, value); },
-                                get() { return desc.get.call(this); }
-                            });
-                        });
+                            Object.defineProperty(Element.prototype, prop, {{
+                                set(value) {{ 
+                                    check(value, prop); 
+                                    return desc.set.call(this, value); 
+                                }},
+                                get() {{ return desc.get.call(this); }}
+                            }});
+                        }});
 
                         const origInsert = Element.prototype.insertAdjacentHTML;
-                        Element.prototype.insertAdjacentHTML = function() {
-                            flag("insertAdjacentHTML");
+                        Element.prototype.insertAdjacentHTML = function() {{
+                            check(arguments[1], "insertAdjacentHTML");
                             return origInsert.apply(this, arguments);
-                        };
+                        }};
 
-                        const observer = new MutationObserver(() => { flag("DOM mutation"); });
-                        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true });
-                    })();
+                        const observer = new MutationObserver(() => {{ flag("DOM_MUTATION"); }});
+                        observer.observe(document.documentElement, {{ childList: true, subtree: true, attributes: true }});
+                    }})();
                 """)
 
                 # ------------------------------------------------------
@@ -169,6 +190,21 @@ class Validator:
                         page,
                         extra_time=PLAYWRIGHT.get("js_observe_time_aggressive", 3)
                     )
+
+                # ------------------------------------------------------
+                # 7️⃣ Strict Verification for Fragments
+                # ------------------------------------------------------
+                if finding.injection_point.source in ["fragment", "fragment_query"]:
+                    # Check if payload is literally in DOM
+                    in_dom = page.evaluate(f"document.documentElement.innerHTML.includes({payload_json})")
+                    
+                    has_sink = any("DOM_SINK_CONFIRMED" in e for e in evidence)
+                    has_xss = any("DOM_XSS_CONFIRMED" in e for e in evidence)
+
+                    if not (has_sink or has_xss or in_dom):
+                        # Downgrade execution if no clear evidence found
+                        executed = False
+                        evidence = [e for e in evidence if "DOM_SOURCE" in e]
 
             except PlaywrightTimeout:
                 finding.evidence = "Playwright timeout during navigation"

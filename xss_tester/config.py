@@ -1,7 +1,8 @@
 # config.py
 
 # ---------- GENERAL ----------
-VERSION = "0.6.20"
+# stored xss version
+VERSION = "0.7.0"
 # identificador unic per detectar reflexions
 MARKER = "DPECE14"
 
