@@ -63,6 +63,7 @@ python3 -m venv ENTORN
 source ENTORN/bin/activate
 # inside (venv) user@localhost
 pip3 install -r requirements.txt
+playwright install
 # your target inside "target.com"
 python3 -m xss_tester.main "https://DOMAIN.TLD"
 ```
