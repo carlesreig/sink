@@ -55,3 +55,14 @@ Built with clean architecture, making it easy to extend with new payloads, conte
 - Security researchers and pentesters
 - Students learning web security internals
 - Custom audits where accuracy matters more than noisy scans
+
+**INSTALL**
+```bash
+git clone https://github.com/carlesreig/xss-tester --depth=1
+python3 -m venv ENTORN
+source ENTORN/bin/activate
+# inside (venv) user@localhost
+pip3 install -r requirements.txt
+# your target inside "target.com"
+python3 -m xss_tester.main "https://DOMAIN.TLD"
+```
