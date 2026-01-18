@@ -138,6 +138,9 @@ class Detector:
     # FASE 2: Form Analysis
     # ----------------------------------------------------------------------
     def _scan_forms(self, base_url, soup, add_point, surface="main"):
+        processed_fields = set()
+
+        # 1. Standard <form> tags
         for form in soup.find_all("form"):
             action = form.get("action") or base_url
             action = urljoin(base_url, action)
@@ -147,30 +150,12 @@ class Detector:
             injectable = []
 
             for field in form.find_all(["input", "textarea", "select"]):
-                name = field.get("name")
+                processed_fields.add(field)
+                name = field.get("name") or field.get("id")
                 if not name:
                     continue
                 
-                value = field.get("value")
-                # Handle textarea content if value attr is missing
-                if field.name == "textarea" and not value:
-                    value = field.text
-
-                if not value:
-                    # Heuristics for default values to pass validation
-                    field_type = field.get("type", "").lower()
-                    name_lower = name.lower()
-                    
-                    if field_type == "email" or "email" in name_lower:
-                        value = "test@example.com"
-                    elif "url" in name_lower or "website" in name_lower:
-                        value = "http://example.com"
-                    elif "date" in name_lower:
-                        value = "2024-01-01"
-                    elif "number" in field_type or "id" in name_lower:
-                        value = "1"
-                    else:
-                        value = "test"
+                value = self._resolve_field_value(field)
 
                 if field.get("type", "").lower() not in ("submit", "button", "hidden"):
                     injectable.append(name)
@@ -183,6 +168,65 @@ class Detector:
                         form=form_obj, url=action, method=method, parameter=name,
                         source="form", attack_surface=surface, confidence="certain"
                     ))
+
+        # 2. Orphan inputs (inputs outside <form>)
+        orphan_fields = []
+        for field in soup.find_all(["input", "textarea", "select"]):
+            if field not in processed_fields and field.find_parent("form") is None:
+                orphan_fields.append(field)
+
+        if orphan_fields:
+            fields = {}
+            injectable = []
+            has_password = False
+
+            for field in orphan_fields:
+                # Fallback to ID if name is missing for orphans
+                name = field.get("name") or field.get("id")
+                if not name:
+                    continue
+                
+                value = self._resolve_field_value(field)
+                field_type = field.get("type", "").lower()
+                
+                if field_type == "password":
+                    has_password = True
+
+                if field_type not in ("submit", "button", "hidden", "image"):
+                    injectable.append(name)
+                fields[name] = value
+
+            if injectable:
+                # Heuristic: assume POST if password present, else GET
+                method = "POST" if has_password else "GET"
+                
+                form_obj = Form(action=base_url, method=method, fields=fields, injectable_fields=injectable)
+                for name in injectable:
+                    add_point(InjectionPoint(
+                        form=form_obj, url=base_url, method=method, parameter=name,
+                        source="form_orphan", attack_surface=surface, confidence="potential"
+                    ))
+
+    def _resolve_field_value(self, field):
+        value = field.get("value")
+        if field.name == "textarea" and not value:
+            value = field.text
+        
+        if not value:
+            field_type = field.get("type", "").lower()
+            name_lower = (field.get("name") or field.get("id") or "").lower()
+            
+            if field_type == "email" or "email" in name_lower:
+                value = "test@example.com"
+            elif "url" in name_lower or "website" in name_lower:
+                value = "http://example.com"
+            elif "date" in name_lower:
+                value = "2024-01-01"
+            elif "number" in field_type or "id" in name_lower:
+                value = "1"
+            else:
+                value = "test"
+        return value
 
     # ----------------------------------------------------------------------
     # FASE 3: Iframe Discovery

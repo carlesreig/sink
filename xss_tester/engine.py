@@ -40,9 +40,13 @@ def load_payloads(path: str | None = None) -> List[Payload]:
 
     for category, entries in raw.items():
         for entry in entries:
+            val = entry["value"]
+            if isinstance(val, str):
+                val = val.strip()
+
             payloads.append(
                 Payload(
-                    value=entry["value"],
+                    value=val,
                     category=category,
                     expected_context=entry.get("expected_context"),
                     expected_subcontext=entry.get("expected_subcontext"),
@@ -153,7 +157,11 @@ def test_point(point: InjectionPoint, payloads: List[Payload]):
     ):
         response, elapsed = _inject_safe(injector, point, payload)
         if response is None:
-            print(f"    {C.RED}[!] Error injecting payload: {elapsed}{C.RESET}")
+            err_msg = str(elapsed)
+            if "Invalid non-printable ASCII character" in err_msg:
+                print(f"    {C.YELLOW}[!] Skipped payload (invalid chars for URL){C.RESET}")
+            else:
+                print(f"    {C.RED}[!] Error injecting payload: {err_msg}{C.RESET}")
             continue
 
         finding = Finding(
@@ -190,5 +198,52 @@ def test_point(point: InjectionPoint, payloads: List[Payload]):
             print(f"    {C.GREEN}[-] Not vulnerable ({elapsed:.2f}s){C.RESET}")
 
         findings.append(finding)
+
+    # ------------------------------------------------------------------
+    # 4️⃣ Evasion / Retry Logic (Double Encoding)
+    # ------------------------------------------------------------------
+    if not findings and reflected:
+        print(f"    {C.CYAN}[*] No findings with standard payloads. Attempting Double Encoding...{C.RESET}")
+        
+        # Retry top 5 payloads
+        retry_payloads = selected_payloads[:5]
+        
+        for payload in tqdm(retry_payloads, desc=f"    DoubleEncode [{point.parameter}]", leave=False):
+            # Manual encode special chars to force double encoding by httpx
+            # httpx encodes '%' as '%25', so '%27' becomes '%2527' on wire
+            encoded_val = ""
+            for char in payload.value:
+                if not char.isalnum():
+                    encoded_val += f"%{ord(char):02X}"
+                else:
+                    encoded_val += char
+            
+            de_payload = Payload(
+                value=encoded_val,
+                category=payload.category,
+                expected_context=payload.expected_context
+            )
+            
+            response, elapsed = _inject_safe(injector, point, de_payload)
+            if response is None: continue
+
+            finding = Finding(injection_point=point, payload=de_payload)
+            
+            # Check reflection (Server might return raw payload or encoded)
+            if payload.value in response.text or encoded_val in response.text:
+                finding.reflected = True
+                finding.injection_point.context = point.context
+                # Swap back to raw payload for validation matching
+                finding.payload = payload
+                finding.evidence = "Double URL Encoding Bypass"
+                
+                finding = validator.active_validation(str(response.url), finding)
+                
+                if finding.executed:
+                    print(f"    {C.RED}{C.BOLD}[!!!] EXECUTED XSS (Double Encoded) ({elapsed:.2f}s){C.RESET}")
+                    findings.append(finding)
+                    break
+                else:
+                    print(f"    {C.YELLOW}[*] Reflected (Double Encoded) ({elapsed:.2f}s){C.RESET}")
 
     return findings

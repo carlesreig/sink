@@ -12,10 +12,19 @@ class PayloadEngine:
 
         # 1. Payloads estàtics del fitxer YAML (filtrats per context)
         for payload in payloads:
-            if payload.expected_context and payload.expected_context != point.context:
-                continue
-            if payload.expected_subcontext and payload.expected_subcontext != point.subcontext:
-                continue
+            # Special case: Attribute Breakout
+            # Allow HTML payloads with 'attribute' subcontext when in 'attribute' context
+            is_breakout = (
+                point.context == "attribute" and 
+                payload.expected_context == "html" and 
+                payload.expected_subcontext == "attribute"
+            )
+
+            if not is_breakout:
+                if payload.expected_context and payload.expected_context != point.context:
+                    continue
+                if payload.expected_subcontext and payload.expected_subcontext != point.subcontext:
+                    continue
             selected.append(payload)
 
         # 2. Payloads dinàmics generats per sinks específics

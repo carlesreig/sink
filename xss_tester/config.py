@@ -2,7 +2,7 @@
 
 # ---------- GENERAL ----------
 # stored xss version
-VERSION = "0.7.0"
+VERSION = "0.7.1"
 # identificador unic per detectar reflexions
 MARKER = "DPECE14"
 
@@ -18,8 +18,8 @@ PLAYWRIGHT = {
 # ---------- SCORING ----------
 RISK_SCORE = {
     "script": 7,
-    "html_attribute": 5,
-    "html_text": 4,
+    "attribute": 5,
+    "html": 4,
     "comment": 1,
     "encoded": 2,
     "unknown": 1,
@@ -33,5 +33,5 @@ RISK_SCORE = {
 }
 
 # ---------- ENGINE ----------
-STOP_ON_FIRST_CONFIRMED = False
+STOP_ON_FIRST_CONFIRMED = True
 MAX_PAYLOADS_PER_POINT = 5

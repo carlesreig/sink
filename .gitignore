@@ -1,0 +1,98 @@
+# ==================================================
+# Python bytecode / cache (global)
+# ==================================================
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# ==================================================
+# Virtual environment
+# ==================================================
+venv/
+.env
+.venv/
+pyvenv.cfg
+
+# ==================================================
+# IDEs / editors
+# ==================================================
+.vscode/
+.idea/
+*.code-workspace
+*.swp
+*.swo
+
+# ==================================================
+# Sistema operatiu
+# ==================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ==================================================
+# Logs, outputs i execucions
+# ==================================================
+logs/
+output/
+results/
+reports/
+*.log
+
+# ==================================================
+# Backups i versions antigues (IMPORTANT)
+# ==================================================
+backups - versions/
+backups*/
+*.zip
+
+# ==================================================
+# Fitxers de treball i documentació interna
+# ==================================================
+*.txt
+workflow.txt
+how to.txt
+estructura carpetes.txt
+estructura recomanada.txt
+mapa conceptual processos deteccio.txt
+proves_vulns_checks.txt
+
+# ==================================================
+# Disseny / recursos gràfics (opcional)
+# Si NO vols pujar logos al repo, deixa-ho actiu
+# ==================================================
+disseny/
+*.png
+
+# ==================================================
+# Configuració sensible / local
+# ==================================================
+config.local.py
+config.local.yaml
+config.local.yml
+secrets.*
+*.key
+*.pem
+*.crt
+
+# ==================================================
+# Tests i coverage
+# ==================================================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ==================================================
+# Cache d'eines i dades temporals
+# ==================================================
+.cache/
+tmp/
+temp/
+
+# ==================================================
+# EXCEPCIONS (aquests fitxers SÍ s'han de pujar)
+# ==================================================
+!payloads/
+!payloads/xss.yaml
+!xss_tester/
+!xss_tester/**.py
+!xss_tester/requirements.txt

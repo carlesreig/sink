@@ -80,7 +80,7 @@ class ContextDetector:
 
                 if marker in val:
                     sub = self._detect_attr_subcontext(attr)
-                    return ("html_attribute", sub)
+                    return ("attribute", sub)
 
                 # DOM sink via attributes (href/src/location)
                 if attr.lower() in ["src", "href"] and self._looks_like_dom_sink(val):
@@ -90,7 +90,7 @@ class ContextDetector:
         # 4️⃣ HTML TEXT
         # -------------------------------------------------
         if marker in soup.get_text():
-            return ("html_text", None)
+            return ("html", None)
 
         # -------------------------------------------------
         # 5️⃣ ENCODING
