@@ -1,6 +1,6 @@
-**XSS Tester – Smart XSS Detection Framework**
+**Sink - XSS Tester – Smart XSS Detection Framework**
 
-XSS Tester is a modular and extensible security testing tool designed to detect, validate, and classify Cross-Site Scripting (XSS) vulnerabilities in modern web applications.
+Sink XSS Tester is a modular and extensible security testing tool designed to detect, validate, and classify Cross-Site Scripting (XSS) vulnerabilities in modern web applications.
 Unlike simple scanners, it combines context-aware payload injection, adaptive testing, and real JavaScript execution validation.
 
 **🔍 Key Features**
