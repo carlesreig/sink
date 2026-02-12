@@ -51,7 +51,7 @@ class Validator:
         executed = False
         evidence = []
 
-        # 0️⃣ Evidence based on static analysis
+        # Evidence based on static analysis
         if finding.injection_point.source == "fragment" and finding.injection_point.confidence == "certain":
             evidence.append("DOM_SOURCE_DETECTED")
 
@@ -81,7 +81,7 @@ class Validator:
                 payload_json = json.dumps(finding.payload.value)
 
                 # ------------------------------------------------------
-                # 1️⃣ Inject Hooks BEFORE Navigation (CRITICAL FIX)
+                # Inject Hooks BEFORE Navigation (CRITICAL FIX)
                 # ------------------------------------------------------
                 page.add_init_script(f"""
                     (() => {{
@@ -151,7 +151,7 @@ class Validator:
                 """)
 
                 # ------------------------------------------------------
-                # 2️⃣ Load page
+                # Load page
                 # ------------------------------------------------------
                 page.goto(
                     url,
@@ -164,7 +164,7 @@ class Validator:
 
                 if not executed:
                     # ------------------------------------------------------
-                    # 3️⃣ Passive DOM discovery
+                    # Passive DOM discovery
                     # ------------------------------------------------------
                     try:
                         page.evaluate("() => { window.__xss_discovery = true; }")
@@ -176,12 +176,12 @@ class Validator:
                         page.evaluate("() => { window.__xss_discovery = false; }")
 
                     # ------------------------------------------------------
-                    # 4️⃣ Autopopulate payload.requires
+                    # Autopopulate payload.requires
                     # ------------------------------------------------------
                     self._autopopulate_requires(finding)
 
                     # ------------------------------------------------------
-                    # 5️⃣ Trigger phase (REAL execution)
+                    # Trigger phase (REAL execution)
                     # ------------------------------------------------------
                     trigger_engine = ExecutionTriggerEngine()
                     try:
@@ -192,7 +192,7 @@ class Validator:
                     executed, evidence = self._observe_execution(page)
 
                 # ------------------------------------------------------
-                # 6️⃣ Aggressive DOM-XSS (fallback)
+                # Aggressive DOM-XSS (fallback)
                 # ------------------------------------------------------
                 if finding.reflected and not executed:
                     try:
@@ -206,7 +206,26 @@ class Validator:
                     )
 
                 # ------------------------------------------------------
-                # 7️⃣ Strict Verification for Fragments
+                # HTML Injection Check (Content Spoofing)
+                # ------------------------------------------------------
+                if not executed and finding.reflected:
+                    try:
+                        is_html_injected = page.evaluate(f"""
+                            () => {{
+                                const payload = {payload_json};
+                                const html = document.documentElement.innerHTML;
+                                return html.includes(payload) || 
+                                       html.includes(payload.replace(/"/g, "'")) ||
+                                       html.includes(payload.replace(/'/g, '"'));
+                            }}
+                        """)
+                        if is_html_injected:
+                            evidence.append("HTML_INJECTION_CONFIRMED")
+                    except Exception:
+                        pass
+
+                # ------------------------------------------------------
+                # Strict Verification for Fragments
                 # ------------------------------------------------------
                 if finding.injection_point.source in ["fragment", "fragment_query"]:
                     # Check if payload is literally in DOM
@@ -230,7 +249,7 @@ class Validator:
                 browser.close()
 
         # ----------------------------------------------------------
-        # 7️⃣ Final verdict
+        # Final verdict
         # ----------------------------------------------------------
         if executed:
             finding.executed = True
@@ -238,6 +257,12 @@ class Validator:
             finding.injection_point.risk_score = min(
                 finding.injection_point.risk_score + 3,
                 10
+            )
+        elif "HTML_INJECTION_CONFIRMED" in evidence:
+            finding.evidence += " | HTML Injection Confirmed (No XSS)"
+            finding.injection_point.risk_score = max(
+                finding.injection_point.risk_score,
+                RISK_SCORE.get("html", 4)
             )
 
         return finding
