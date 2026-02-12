@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 from xss_tester.core.models import InjectionPoint, Finding, Payload
 from xss_tester.core.injector import Injector
-from xss_tester.config import REQUEST_TIMEOUT
+from xss_tester.config import REQUEST_TIMEOUT, HEADERS
 
 
 class StoredXSSFinding(Finding):
@@ -33,7 +33,7 @@ class StoredXSSDetector:
         payload = Payload(value=marker, category="stored_probe")
 
         # Use a session to maintain state (cookies) between injection and check
-        with httpx.Client(timeout=REQUEST_TIMEOUT, verify=False) as client:
+        with httpx.Client(timeout=REQUEST_TIMEOUT, verify=False, headers=HEADERS) as client:
             self.injector.client = client
             
             # Warmup: Visit the page to get cookies/tokens if needed
@@ -72,7 +72,7 @@ class StoredXSSDetector:
         payload_val = f"<img src=x onerror=alert('STORED_{uid}')>"
         payload = Payload(value=payload_val, category="stored_active")
 
-        with httpx.Client(timeout=REQUEST_TIMEOUT, verify=False) as client:
+        with httpx.Client(timeout=REQUEST_TIMEOUT, verify=False, headers=HEADERS) as client:
             self.injector.client = client
             try:
                 # Warmup

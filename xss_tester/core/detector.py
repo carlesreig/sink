@@ -4,13 +4,14 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, parse_qs, urljoin
 from .models import InjectionPoint, Form
 from .context_detector import ContextDetector
+from xss_tester.config import HEADERS
 
 
 class Detector:
 
     def __init__(self):
         # Client intern per fer crawling lleuger d'iframes
-        self.client = httpx.Client(timeout=5.0, verify=False)
+        self.client = httpx.Client(timeout=5.0, verify=False, headers=HEADERS)
 
     def detect(self, url: str, html: str) -> list[InjectionPoint]:
         soup = BeautifulSoup(html, "html.parser")

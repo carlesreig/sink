@@ -2,6 +2,7 @@
 import httpx
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+from xss_tester.config import HEADERS
 
 class Crawler:
     def __init__(self, base_url: str):
@@ -15,7 +16,7 @@ class Crawler:
         self.visited.add(url)
         links = []
 
-        r = httpx.get(url, timeout=10)
+        r = httpx.get(url, timeout=10, headers=HEADERS)
         soup = BeautifulSoup(r.text, "html.parser")
 
         for a in soup.find_all("a", href=True):

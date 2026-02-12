@@ -1,6 +1,6 @@
 import httpx
 from xss_tester.core.models import InjectionPoint, Payload
-from xss_tester.config import REQUEST_TIMEOUT
+from xss_tester.config import REQUEST_TIMEOUT, HEADERS
 
 
 class Injector:
@@ -26,6 +26,7 @@ class Injector:
             url,
             timeout=REQUEST_TIMEOUT,
             follow_redirects=True,
+            headers=HEADERS,
             **kwargs
         )
 
