@@ -12,7 +12,7 @@ __pycache__/
 !payloads/
 !xss_tester/
 
-# Permetre contingut de payloads
+# Permetre tot el contingut de payloads
 !payloads/**
 
 # Permetre contingut de xss_tester
@@ -25,8 +25,4 @@ __pycache__/
 !xss_tester/core/**
 
 # Permetre el propi .gitignore
-<<<<<<< HEAD
 !.gitignore
-=======
-!.gitignore
->>>>>>> 0775150d86f653c519599d89f1c73ff9a779f630
