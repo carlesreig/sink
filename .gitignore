@@ -1,0 +1,32 @@
+# Ignorar-ho tot per defecte
+*
+
+# Ignorar carpetes temporals, caché...
+__pycache__/
+
+# Permetre fitxers del directori arrel
+!LICENSE
+!README.md
+
+# Permetre carpetes necessàries
+!payloads/
+!xss_tester/
+
+# Permetre contingut de payloads
+!payloads/**
+
+# Permetre contingut de xss_tester
+!xss_tester/__init__.py
+!xss_tester/config.py
+!xss_tester/engine.py
+!xss_tester/main.py
+!xss_tester/requirements.txt
+!xss_tester/core/
+!xss_tester/core/**
+
+# Permetre el propi .gitignore
+<<<<<<< HEAD
+!.gitignore
+=======
+!.gitignore
+>>>>>>> 0775150d86f653c519599d89f1c73ff9a779f630
