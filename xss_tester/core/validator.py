@@ -57,14 +57,15 @@ class Validator:
 
         with sync_playwright() as p:
             browser = p.chromium.launch(
-                headless=PLAYWRIGHT["headless"]
+                headless=PLAYWRIGHT["headless"],
+                args=["--disable-blink-features=AutomationControlled"]
             )
             context = browser.new_context(
                 ignore_https_errors=True,
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
                 extra_http_headers={
                     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-                    "Accept-Language": "hu-HU,hu;q=0.9,en-US;q=0.8",
+                    "Accept-Language": "en-US,en;q=0.9",
                     "Accept-Encoding": "gzip, deflate, br",
                     "Connection": "keep-alive",
                     "Upgrade-Insecure-Requests": "1",

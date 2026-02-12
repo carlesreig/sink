@@ -1,6 +1,5 @@
 from playwright.sync_api import Page
 
-
 # --------------------------------------------------
 # <details ontoggle=...>
 # --------------------------------------------------
@@ -17,7 +16,6 @@ def trigger_ontoggle(page: Page) -> bool:
     """)
     page.wait_for_timeout(300)
     return page.evaluate("window.__xss && window.__xss.triggered === true")
-
 
 # --------------------------------------------------
 # onmouseover
@@ -36,7 +34,6 @@ def trigger_onmouseover(page: Page) -> bool:
     """)
     page.wait_for_timeout(300)
     return page.evaluate("window.__xss && window.__xss.triggered === true")
-
 
 # --------------------------------------------------
 # onfocus

@@ -1,5 +1,3 @@
-# config.py
-
 # ---------- GENERAL ----------
 # evitar WAFs
 VERSION = "0.7.2"
