@@ -1,8 +1,8 @@
 # config.py
 
 # ---------- GENERAL ----------
-# stored xss version
-VERSION = "0.7.1"
+# evitar WAFs
+VERSION = "0.7.2"
 # identificador unic per detectar reflexions
 MARKER = "DPECE14"
 
@@ -12,7 +12,7 @@ REQUEST_TIMEOUT = 4
 PLAYWRIGHT = {
     "headless": True,
     "page_timeout": 10000,
-    "post_load_wait": 2000
+    "post_load_wait": 2000,
 }
 
 # ---------- SCORING ----------
