@@ -58,7 +58,7 @@ Built with clean architecture, making it easy to extend with new payloads, conte
 
 # INSTALL
 ```bash
-git clone https://github.com/carlesreig/xss-tester --depth=1
+git clone https://github.com/carlesreig/sink --depth=1
 python3 -m venv ~/venv/ENTORN-sink
 source ~/venv/ENTORN-sink/bin/activate
 pip3 install -r requirements.txt
